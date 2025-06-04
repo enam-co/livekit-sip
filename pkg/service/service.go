@@ -55,6 +55,8 @@ type Service struct {
 	pprofServer  *http.Server
 	rpcSIPServer rpc.SIPInternalServer
 
+	healthServer *http.Server
+
 	sipServiceStop        sipServiceStopFunc
 	sipServiceActiveCalls sipServiceActiveCallsFunc
 
@@ -98,6 +100,14 @@ func NewService(
 			Handler: mux,
 		}
 	}
+	if conf.HealthPort > 0 {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/healthz", s.healthz)
+		s.healthServer = &http.Server{
+			Addr:    fmt.Sprintf(":%d", conf.HealthPort),
+			Handler: mux,
+		}
+	}
 	return s
 }
 
@@ -122,6 +132,17 @@ func (s *Service) Run() error {
 	}
 
 	if srv := s.pprofServer; srv != nil {
+		l, err := net.Listen("tcp", srv.Addr)
+		if err != nil {
+			return err
+		}
+		defer l.Close()
+		go func() {
+			_ = srv.Serve(l)
+		}()
+	}
+
+	if srv := s.healthServer; srv != nil {
 		l, err := net.Listen("tcp", srv.Addr)
 		if err != nil {
 			return err
@@ -189,6 +210,14 @@ func (s *Service) GetMediaProcessor(_ []livekit.SIPFeature) msdk.PCM16Processor 
 
 func (s *Service) Health() stats.HealthStatus {
 	return s.mon.Health()
+}
+
+func (s *Service) healthz(w http.ResponseWriter, r *http.Request) {
+	if s.Health() == stats.HealthOK {
+		w.WriteHeader(http.StatusOK)
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}
 }
 
 func (s *Service) RegisterCreateSIPParticipantTopic() error {

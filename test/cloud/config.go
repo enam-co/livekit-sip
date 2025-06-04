@@ -26,6 +26,7 @@ func NewIntegrationConfig() (*IntegrationConfig, error) {
 			WsUrl:              os.Getenv("LIVEKIT_WS_URL"),
 			ServiceName:        "sip",
 			EnableJitterBuffer: true,
+			HealthPort:         9086,
 		},
 		RoomName: "test",
 	}

@@ -2,6 +2,8 @@ package cloud
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -9,6 +11,7 @@ import (
 
 	"github.com/livekit/protocol/logger"
 	"github.com/livekit/psrpc"
+	"github.com/livekit/sip/pkg/config"
 )
 
 func TestSIP(t *testing.T) {
@@ -32,6 +35,15 @@ func TestSIP(t *testing.T) {
 	go func() {
 		_ = svc.Run()
 	}()
+
+	ip, err := config.GetLocalIP()
+	require.NoError(t, err)
+
+	time.Sleep(time.Second * 1)
+	resp, err := http.Get(fmt.Sprintf("http://%s:%d/healthz", ip.String(), conf.HealthPort))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	a, err := NewPhoneClient(false)
 	require.NoError(t, err)
